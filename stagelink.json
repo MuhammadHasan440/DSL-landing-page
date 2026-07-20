@@ -6,8 +6,21 @@
     "contact": {
       "path": "/api/contact",
       "handler": "api/contact.handler",
-      "memory": 512,
-      "timeout": 30
+      "memory": 1024,
+      "timeout": 60
     }
+  },
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "build": {
+    "exclude": [
+      "node_modules/.bin",
+      ".git",
+      ".env.example",
+      "*.test.js",
+      "README.md",
+      "vercel.json"
+    ]
   }
 }

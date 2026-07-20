@@ -7,8 +7,14 @@
     "start": "node api/contact.js",
     "dev": "node api/contact.js"
   },
-  "keywords": ["contact-form", "firebase", "nodemailer", "serverless", "stagelink"],
-  "author": "",
+  "keywords": [
+    "contact-form",
+    "firebase",
+    "nodemailer",
+    "serverless",
+    "stagelink"
+  ],
+  "author": "DSL",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
