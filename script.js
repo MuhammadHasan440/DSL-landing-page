@@ -1,82 +1,130 @@
+// ==================== CONTACT FORM ====================
 const contactForm = document.getElementById("contactForm");
 
-contactForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
+// Production API URL - StageLink
+const API_URL = '/api/contact';
 
-    const submitBtn = contactForm.querySelector("button");
+if (contactForm) {
+    contactForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
 
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = "Sending...";
+        const submitBtn = contactForm.querySelector("button");
 
-    const formData = {
-        name: contactForm.name.value.trim(),
-        email: contactForm.email.value.trim(),
-        message: contactForm.message.value.trim()
-    };
+        // Disable button - Loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = "Sending...";
 
-    try {
+        // Form data
+        const formData = {
+            name: contactForm.name.value.trim(),
+            email: contactForm.email.value.trim(),
+            message: contactForm.message.value.trim()
+        };
 
-        const response = await fetch("http://localhost:5000/api/contact", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(formData)
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-
-            alert("✅ Thank you! Your message has been sent.");
-
-            contactForm.reset();
-
-        } else {
-
-            alert(data.message || "Something went wrong.");
-
+        // ==================== CLIENT-SIDE VALIDATION ====================
+        if (!formData.name) {
+            alert("Please enter your name.");
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `Book A Free Consultation <span>→</span>`;
+            return;
         }
 
-    } catch (error) {
+        if (!formData.email) {
+            alert("Please enter your email address.");
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `Book A Free Consultation <span>→</span>`;
+            return;
+        }
 
-        console.error(error);
+        // Email format validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+            alert("Please enter a valid email address.");
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `Book A Free Consultation <span>→</span>`;
+            return;
+        }
 
-        alert("Server connection failed.");
+        if (!formData.message) {
+            alert("Please enter your message.");
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `Book A Free Consultation <span>→</span>`;
+            return;
+        }
 
-    }
+        if (formData.message.length < 10) {
+            alert("Message must be at least 10 characters.");
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `Book A Free Consultation <span>→</span>`;
+            return;
+        }
 
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = `Book A Free Consultation <span>→</span>`;
-});
-const testimonials = [
-{
-    service: "Mobile App",
-    initials: "MT",
-    name: "Marcus T.",
-    role: "Founder & CEO",
-    tag: "Speed + Quality",
-    review: `"We had a tight investor deadline and needed a working product, not just a prototype. Shift delivered our cross-platform app in 11 weeks without cutting corners on quality. Every sprint demo gave us something real to show stakeholders. That kind of pace with that level of polish is genuinely rare."`
-},
+        try {
+            const response = await fetch(API_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(formData)
+            });
 
-{
-    service: "Web Platform",
-    initials: "AS",
-    name: "Amanda S.",
-    role: "Product Manager",
-    tag: "Communication",
-    review: `"Excellent communication throughout the project. Every milestone was delivered on time, and the final product exceeded our expectations."`
-},
+            const data = await response.json();
 
-{
-    service: "UI/UX Design",
-    initials: "JR",
-    name: "James R.",
-    role: "Startup Founder",
-    tag: "Amazing Design",
-    review: `"Their designers completely transformed our product. The interface is beautiful, intuitive, and users love the experience."`
+            if (response.ok) {
+                // ✅ Success
+                alert("✅ Thank you! Your message has been sent. We'll get back to you soon.");
+                contactForm.reset();
+            } else if (response.status === 400) {
+                // ❌ Validation Error
+                alert(data.message || "Please check your input and try again.");
+            } else if (response.status === 429) {
+                // ⏳ Rate Limited
+                alert("⏳ Too many requests. Please wait a moment before submitting again.");
+            } else if (response.status === 503) {
+                // ⚠️ Service Unavailable
+                alert("⏳ Service is temporarily busy. Please try again in a few minutes.");
+            } else {
+                // ❌ Other Errors
+                alert(data.message || "Something went wrong. Please try again.");
+            }
+
+        } catch (error) {
+            console.error("Contact form error:", error);
+            alert("Unable to connect to the server. Please check your internet connection and try again.");
+        } finally {
+            // Re-enable button
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `Book A Free Consultation <span>→</span>`;
+        }
+    });
 }
 
+// ==================== TESTIMONIALS ====================
+const testimonials = [
+    {
+        service: "Mobile App",
+        initials: "MT",
+        name: "Marcus T.",
+        role: "Founder & CEO",
+        tag: "Speed + Quality",
+        review: `"We had a tight investor deadline and needed a working product, not just a prototype. Shift delivered our cross-platform app in 11 weeks without cutting corners on quality. Every sprint demo gave us something real to show stakeholders. That kind of pace with that level of polish is genuinely rare."`
+    },
+    {
+        service: "Web Platform",
+        initials: "AS",
+        name: "Amanda S.",
+        role: "Product Manager",
+        tag: "Communication",
+        review: `"Excellent communication throughout the project. Every milestone was delivered on time, and the final product exceeded our expectations."`
+    },
+    {
+        service: "UI/UX Design",
+        initials: "JR",
+        name: "James R.",
+        role: "Startup Founder",
+        tag: "Amazing Design",
+        review: `"Their designers completely transformed our product. The interface is beautiful, intuitive, and users love the experience."`
+    }
 ];
 
 let current = 0;
@@ -88,228 +136,160 @@ const role = document.querySelector(".client-info p");
 const reviewTag = document.querySelector(".review-tag");
 const reviewText = document.querySelector(".review-text");
 
-function updateTestimonial(){
-
+function updateTestimonial() {
     const item = testimonials[current];
-
-    service.textContent = item.service;
-    initials.textContent = item.initials;
-    clientName.textContent = item.name;
-    role.textContent = item.role;
-    reviewTag.textContent = item.tag;
-    reviewText.textContent = item.review;
-
+    
+    if (service) service.textContent = item.service;
+    if (initials) initials.textContent = item.initials;
+    if (clientName) clientName.textContent = item.name;
+    if (role) role.textContent = item.role;
+    if (reviewTag) reviewTag.textContent = item.tag;
+    if (reviewText) reviewText.textContent = item.review;
 }
 
-document.querySelector(".next-btn").addEventListener("click",()=>{
+const nextBtn = document.querySelector(".next-btn");
+const prevBtn = document.querySelector(".prev-btn");
 
-    current++;
+if (nextBtn) {
+    nextBtn.addEventListener("click", () => {
+        current++;
+        if (current >= testimonials.length) {
+            current = 0;
+        }
+        updateTestimonial();
+    });
+}
 
-    if(current >= testimonials.length){
-        current = 0;
-    }
+if (prevBtn) {
+    prevBtn.addEventListener("click", () => {
+        current--;
+        if (current < 0) {
+            current = testimonials.length - 1;
+        }
+        updateTestimonial();
+    });
+}
 
-    updateTestimonial();
-
-});
-
-document.querySelector(".prev-btn").addEventListener("click",()=>{
-
-    current--;
-
-    if(current < 0){
-        current = testimonials.length - 1;
-    }
-
-    updateTestimonial();
-
-});
-
+// Initialize first testimonial
 updateTestimonial();
+
+// ==================== FAQ ACCORDION ====================
 const faqItems = document.querySelectorAll(".faq-item");
 
 faqItems.forEach(item => {
-
     const question = item.querySelector(".faq-question");
 
-    question.addEventListener("click", () => {
+    if (question) {
+        question.addEventListener("click", () => {
+            const isActive = item.classList.contains("active");
 
-        const isActive = item.classList.contains("active");
+            // Close all items
+            faqItems.forEach(faq => {
+                faq.classList.remove("active");
+                const answer = faq.querySelector(".faq-answer");
+                const icon = faq.querySelector(".faq-icon");
+                if (answer) answer.style.maxHeight = null;
+                if (icon) icon.textContent = "+";
+            });
 
-        // Close all items
-        faqItems.forEach(faq => {
-            faq.classList.remove("active");
-
-            const answer = faq.querySelector(".faq-answer");
-            const icon = faq.querySelector(".faq-icon");
-
-            answer.style.maxHeight = null;
-            icon.textContent = "+";
+            // Open clicked item
+            if (!isActive) {
+                item.classList.add("active");
+                const answer = item.querySelector(".faq-answer");
+                const icon = item.querySelector(".faq-icon");
+                if (answer) answer.style.maxHeight = answer.scrollHeight + "px";
+                if (icon) icon.textContent = "−";
+            }
         });
-
-        // Open clicked item
-        if (!isActive) {
-
-            item.classList.add("active");
-
-            const answer = item.querySelector(".faq-answer");
-            const icon = item.querySelector(".faq-icon");
-
-            answer.style.maxHeight = answer.scrollHeight + "px";
-            icon.textContent = "−";
-        }
-
-    });
-
+    }
 });
 
-/*-------------------------------
-    Open First FAQ By Default
---------------------------------*/
-
+// Open First FAQ By Default
 window.addEventListener("load", () => {
-
     const firstItem = document.querySelector(".faq-item");
-
-    if(firstItem){
-
+    if (firstItem) {
         firstItem.classList.add("active");
-
         const answer = firstItem.querySelector(".faq-answer");
         const icon = firstItem.querySelector(".faq-icon");
-
-        answer.style.maxHeight = answer.scrollHeight + "px";
-        icon.textContent = "−";
+        if (answer) answer.style.maxHeight = answer.scrollHeight + "px";
+        if (icon) icon.textContent = "−";
     }
+});
 
-});/*==============================
-        NAVBAR
-==============================*/
-
+// ==================== NAVBAR ====================
 const header = document.querySelector(".header");
 const menuBtn = document.querySelector(".menu-btn");
 const navLinks = document.querySelector(".nav-links");
 const navItems = document.querySelectorAll(".nav-links a");
 
-/*==============================
-    MOBILE MENU
-==============================*/
-
-menuBtn.addEventListener("click", () => {
-
-    menuBtn.classList.toggle("active");
-    navLinks.classList.toggle("active");
-
-    document.body.classList.toggle("menu-open");
-
-});
-
-/*==============================
-    CLOSE MENU
-==============================*/
-
-navItems.forEach(link => {
-
-    link.addEventListener("click", () => {
-
-        menuBtn.classList.remove("active");
-        navLinks.classList.remove("active");
-
-        document.body.classList.remove("menu-open");
-
+// Mobile Menu Toggle
+if (menuBtn && navLinks) {
+    menuBtn.addEventListener("click", () => {
+        menuBtn.classList.toggle("active");
+        navLinks.classList.toggle("active");
+        document.body.classList.toggle("menu-open");
     });
+}
 
+// Close Menu on Link Click
+navItems.forEach(link => {
+    link.addEventListener("click", () => {
+        if (menuBtn) menuBtn.classList.remove("active");
+        if (navLinks) navLinks.classList.remove("active");
+        document.body.classList.remove("menu-open");
+    });
 });
 
-/*==============================
-    STICKY NAVBAR
-==============================*/
-
+// Sticky Navbar
 window.addEventListener("scroll", () => {
-
-    if(window.scrollY > 40){
-
-        header.classList.add("scrolled");
-
-    }else{
-
-        header.classList.remove("scrolled");
-
+    if (header) {
+        if (window.scrollY > 40) {
+            header.classList.add("scrolled");
+        } else {
+            header.classList.remove("scrolled");
+        }
     }
-
 });
 
-/*==============================
-    ACTIVE SECTION
-==============================*/
-
+// Active Section Highlight
 const sections = document.querySelectorAll("section[id]");
 
 window.addEventListener("scroll", () => {
-
-    let current = "";
+    let currentSection = "";
 
     sections.forEach(section => {
-
         const sectionTop = section.offsetTop - 120;
         const sectionHeight = section.offsetHeight;
 
-        if(window.scrollY >= sectionTop &&
-           window.scrollY < sectionTop + sectionHeight){
-
-            current = section.getAttribute("id");
-
+        if (window.scrollY >= sectionTop && window.scrollY < sectionTop + sectionHeight) {
+            currentSection = section.getAttribute("id");
         }
-
     });
 
     navItems.forEach(link => {
-
         link.classList.remove("active");
-
-        if(link.getAttribute("href") === "#" + current){
-
+        if (link.getAttribute("href") === "#" + currentSection) {
             link.classList.add("active");
-
         }
-
     });
-
 });
 
-/*==============================
-    OUTSIDE CLICK CLOSE
-==============================*/
-
-document.addEventListener("click",(e)=>{
-
-    if(
-        !navLinks.contains(e.target) &&
-        !menuBtn.contains(e.target)
-    ){
-
-        menuBtn.classList.remove("active");
-        navLinks.classList.remove("active");
-
-        document.body.classList.remove("menu-open");
-
+// Close Menu on Outside Click
+document.addEventListener("click", (e) => {
+    if (navLinks && menuBtn) {
+        if (!navLinks.contains(e.target) && !menuBtn.contains(e.target)) {
+            menuBtn.classList.remove("active");
+            navLinks.classList.remove("active");
+            document.body.classList.remove("menu-open");
+        }
     }
-
 });
 
-/*==============================
-    ESC KEY
-==============================*/
-
-document.addEventListener("keydown",(e)=>{
-
-    if(e.key === "Escape"){
-
-        menuBtn.classList.remove("active");
-        navLinks.classList.remove("active");
-
+// Close Menu on ESC Key
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+        if (menuBtn) menuBtn.classList.remove("active");
+        if (navLinks) navLinks.classList.remove("active");
         document.body.classList.remove("menu-open");
-
     }
-
 });

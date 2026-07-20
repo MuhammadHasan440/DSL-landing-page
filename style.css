@@ -2861,7 +2861,7 @@ justify-content: center;
 
 .mobile-image img{
 
-    width:1420;
+    width:1420px;
 
     max-width:1000px;
 
@@ -2880,6 +2880,15 @@ justify-content: center;
 
 }
 
+.mobile-image img{
+
+    width:1420px;
+
+    max-width:300px;
+
+    display:block;
+
+    margin:auto;}
 
 .timeline:before{
 

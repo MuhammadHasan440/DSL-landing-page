@@ -1,0 +1,13 @@
+{
+  "name": "contact-form-api",
+  "version": "1.0.0",
+  "runtime": "nodejs18",
+  "functions": {
+    "contact": {
+      "path": "/api/contact",
+      "handler": "api/contact.handler",
+      "memory": 512,
+      "timeout": 30
+    }
+  }
+}
