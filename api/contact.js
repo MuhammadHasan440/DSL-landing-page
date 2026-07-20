@@ -1,5 +1,5 @@
 /**
- * Serverless Contact Form API for StageLink
+ * Serverless Contact Form API for Vercel
  * Firebase Firestore + Nodemailer Email
  */
 
@@ -8,50 +8,73 @@ const nodemailer = require('nodemailer');
 const cors = require('cors');
 const express = require('express');
 
-// ==================== FIREBASE ADMIN INIT ====================
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    }),
-  });
-}
-const db = admin.firestore();
-
-// ==================== EMAIL TRANSPORTER ====================
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false,
-    minVersion: 'TLSv1.2',
-  },
-});
-
 // ==================== EXPRESS APP ====================
 const app = express();
 
-// CORS
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(o => o.trim());
+// ==================== CORS - FIXED ====================
+// Allow all origins for testing (production mein specific domain daalein)
 app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
-      cb(null, true);
-    } else {
-      cb(new Error('CORS not allowed'));
-    }
-  },
-  methods: ['POST', 'OPTIONS', 'GET'],
+  origin: '*',  // ⭐ Sab ko allow karein
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
+// Handle preflight requests manually
+app.options('*', cors()); // Enable preflight for all routes
+
 app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// ==================== FIREBASE ADMIN INIT ====================
+try {
+  if (!admin.apps.length) {
+    if (!process.env.FIREBASE_PROJECT_ID || 
+        !process.env.FIREBASE_CLIENT_EMAIL || 
+        !process.env.FIREBASE_PRIVATE_KEY) {
+      console.error('❌ Firebase credentials missing!');
+    } else {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        }),
+      });
+      console.log('✅ Firebase initialized');
+    }
+  }
+} catch (error) {
+  console.error('❌ Firebase init error:', error.message);
+}
+const db = admin.apps.length > 0 ? admin.firestore() : null;
+
+// ==================== EMAIL TRANSPORTER ====================
+let transporter = null;
+try {
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      tls: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2',
+      },
+    });
+    console.log('✅ Email transporter created');
+  } else {
+    console.error('❌ SMTP credentials missing!');
+  }
+} catch (error) {
+  console.error('❌ Email transporter error:', error.message);
+}
 
 // ==================== ADMIN EMAIL TEMPLATE ====================
 const getAdminEmail = (data) => {
@@ -142,13 +165,43 @@ const getCustomerEmail = (data) => {
 </html>`;
 };
 
+// ==================== HEALTH CHECK ====================
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    platform: 'Vercel',
+    firebase: db ? 'Connected' : 'Not Connected',
+    email: transporter ? 'Configured' : 'Not Configured',
+  });
+});
+
 // ==================== MAIN CONTACT ENDPOINT ====================
 app.post('/api/contact', async (req, res) => {
   try {
-    // 1. Get Data from Form
+    console.log('📨 Contact form submitted');
+
+    // Check Firebase
+    if (!db) {
+      console.error('❌ Firebase not initialized');
+      return res.status(500).json({
+        success: false,
+        message: 'Database connection error. Please try again later.',
+      });
+    }
+
+    // Check Email
+    if (!transporter) {
+      console.error('❌ Email not configured');
+      return res.status(500).json({
+        success: false,
+        message: 'Email service error. Please try again later.',
+      });
+    }
+
     const { name, email, phone = '', company = '', service = '', budget = '', message } = req.body;
 
-    // 2. Validation
+    // Validation
     if (!name?.trim()) {
       return res.status(400).json({ success: false, message: 'Name is required' });
     }
@@ -165,7 +218,6 @@ app.post('/api/contact', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Message must be at least 10 characters' });
     }
 
-    // 3. Sanitize Data
     const sanitized = {
       name: name.trim(),
       email: email.trim().toLowerCase(),
@@ -176,28 +228,24 @@ app.post('/api/contact', async (req, res) => {
       message: message.trim(),
     };
 
-    // 4. Get Client Info
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
                req.socket?.remoteAddress ||
                req.ip ||
                'Unknown';
     const userAgent = req.headers['user-agent'] || 'Unknown';
 
-    // =============================================
-    // 5. SAVE TO FIRESTORE DATABASE
-    // =============================================
+    // Save to Firestore
     const firestoreData = {
       ...sanitized,
       ip,
       userAgent,
-      status: 'new',  // new, read, replied
+      status: 'new',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
     const docRef = await db.collection('contact_submissions').add(firestoreData);
     console.log(`✅ Firestore saved: ${docRef.id}`);
 
-    // 6. Prepare Email Data
     const emailData = {
       ...sanitized,
       ip,
@@ -205,9 +253,7 @@ app.post('/api/contact', async (req, res) => {
       createdAt: new Date().toISOString(),
     };
 
-    // =============================================
-    // 7. SEND ADMIN EMAIL NOTIFICATION
-    // =============================================
+    // Send Admin Email
     await transporter.sendMail({
       from: `"DSL Website" <${process.env.SMTP_USER}>`,
       to: process.env.OWNER_EMAIL,
@@ -215,48 +261,34 @@ app.post('/api/contact', async (req, res) => {
       subject: `New Consultation Request - ${sanitized.name}`,
       html: getAdminEmail(emailData),
     });
-    console.log('✅ Admin email sent to:', process.env.OWNER_EMAIL);
+    console.log('✅ Admin email sent');
 
-    // =============================================
-    // 8. SEND CUSTOMER AUTO-REPLY EMAIL
-    // =============================================
+    // Send Customer Reply
     await transporter.sendMail({
       from: `"DSL Team" <${process.env.SMTP_USER}>`,
       to: sanitized.email,
       subject: 'Thank you for contacting DSL',
       html: getCustomerEmail(emailData),
     });
-    console.log('✅ Customer email sent to:', sanitized.email);
+    console.log('✅ Customer email sent');
 
-    // =============================================
-    // 9. SUCCESS RESPONSE
-    // =============================================
     return res.status(200).json({
       success: true,
       message: 'Your message has been sent successfully. We\'ll get back to you soon!',
-      submissionId: docRef.id,  // Firestore document ID
+      submissionId: docRef.id,
     });
 
   } catch (error) {
-    console.error('🔥 Contact API Error:', error);
+    console.error('🔥 Contact API Error:', error.message);
+    console.error('📚 Stack:', error.stack);
     
     return res.status(500).json({
       success: false,
       message: 'Something went wrong. Please try again later.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 });
 
-// ==================== HEALTH CHECK ====================
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    platform: 'StageLink',
-    firebase: admin.apps.length > 0 ? 'Connected' : 'Not Connected',
-  });
-});
-
-// ==================== EXPORT FOR STAGELINK ====================
+// ==================== EXPORT FOR VERCEL ====================
 module.exports = app;
-module.exports.handler = app;

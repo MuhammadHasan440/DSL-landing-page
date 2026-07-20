@@ -1,21 +1,12 @@
 {
   "name": "contact-form-api",
   "version": "1.0.0",
-  "description": "Serverless contact form with Firebase + Nodemailer for StageLink",
+  "description": "Serverless contact form with Firebase + Nodemailer",
   "main": "api/contact.js",
   "scripts": {
     "start": "node api/contact.js",
     "dev": "node api/contact.js"
   },
-  "keywords": [
-    "contact-form",
-    "firebase",
-    "nodemailer",
-    "serverless",
-    "stagelink"
-  ],
-  "author": "DSL",
-  "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.2",
